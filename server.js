@@ -37,7 +37,6 @@ app.post("/create-checkout-session", async (req, res) => {
         quantity: 1
       }],
       success_url: "https://SUSHIX0.github.io/test/success.html", // куда идти после успеха
-      cancel_url: "https://SUSHIX0.github.io/test/cancel.html"   // куда идти после отмены
     });
 
     res.json({ url: session.url });
