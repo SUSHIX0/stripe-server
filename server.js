@@ -25,35 +25,19 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 
   try {
-    const line_items = items.map(item => ({
-  price_data: {
-    currency: "eur",
-    product_data: { name: item.name },
-    unit_amount: Math.round(item.unit_price * 100)
-  },
-  quantity: item.qty
-}));
-
-// Добавляем доставку отдельным пунктом
-if (delivery && delivery > 0) {
-  line_items.push({
-    price_data: {
-      currency: "eur",
-      product_data: { name: "Доставка" },
-      unit_amount: Math.round(delivery * 100)
-    },
-    quantity: 1
-  });
-}
-
-const session = await stripe.checkout.sessions.create({
-  mode: "payment",
-  payment_method_types: ["card"],
-  line_items,
-  success_url: "https://SUSHIX0.github.io/test/success.html",
-  cancel_url: "https://SUSHIX0.github.io/test/cancel.html"
-});
-
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          product_data: { name: "Тестовый платёж" },
+          unit_amount: Math.round(amount * 100) // Stripe принимает сумму в центах
+        },
+        quantity: 1
+      }],
+      success_url: "https://SUSHIX0.github.io/test/success.html", // куда идти после успеха
+    });
 
     res.json({ url: session.url });
   } catch (err) {
