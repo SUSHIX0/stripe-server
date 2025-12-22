@@ -2,41 +2,106 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Тестовая оплата Stripe</title>
+  <title>Магазин с количеством и скидками</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .product { margin-bottom: 10px; }
+    .cart { margin-top: 20px; }
+    button { padding: 5px 10px; margin-left: 10px; }
+    input[type=number] { width: 50px; }
+    .cart-item { margin-bottom: 5px; }
+  </style>
 </head>
 <body>
-  <h1>Тестовая оплата Stripe</h1>
+  <h1>Магазин с количеством и скидками</h1>
 
-  <label>
-    Сумма (€):
-    <input type="number" id="amount" step="0.01" min="0.5" value="10">
-  </label>
+  <div class="products">
+    <div class="product">
+      <span>Товар A — 5 €</span>
+      <input type="number" min="1" value="1" id="qtyA">
+      <button onclick="addToCart('Товар A', 5, 'qtyA')">Добавить</button>
+    </div>
+    <div class="product">
+      <span>Товар B — 8 €</span>
+      <input type="number" min="1" value="1" id="qtyB">
+      <button onclick="addToCart('Товар B', 8, 'qtyB')">Добавить</button>
+    </div>
+    <div class="product">
+      <span>Скидка — 10%</span>
+      <input type="number" min="1" value="1" id="qtyC">
+      <button onclick="addDiscount(10)">Применить скидку</button>
+    </div>
+  </div>
 
-  <br><br>
-
-  <button id="pay">Перейти к оплате</button>
+  <div class="cart">
+    <h2>Корзина</h2>
+    <ul id="cartItems"></ul>
+    <p id="total">Итого: 0 €</p>
+    <button id="pay">Перейти к оплате</button>
+  </div>
 
   <script>
-    document.getElementById("pay").onclick = async () => {
-      const amount = document.getElementById("amount").value;
+    const cart = [];
+    let discountPercent = 0;
 
-      if (!amount || amount <= 0) {
-        alert("Введите корректную сумму");
+    function addToCart(name, price, qtyId) {
+      const qty = parseInt(document.getElementById(qtyId).value);
+      if (!qty || qty <= 0) {
+        alert("Введите корректное количество");
+        return;
+      }
+      cart.push({ name, price, quantity: qty });
+      renderCart();
+    }
+
+    function addDiscount(percent) {
+      discountPercent = percent;
+      alert(`Скидка ${percent}% будет применена к корзине`);
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cartItems');
+      const totalEl = document.getElementById('total');
+      list.innerHTML = '';
+      let total = 0;
+      cart.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'cart-item';
+        li.textContent = `${item.name} — ${item.price} € × ${item.quantity} = ${item.price * item.quantity} €`;
+        list.appendChild(li);
+        total += item.price * item.quantity;
+      });
+      if (discountPercent > 0) {
+        total = total * (1 - discountPercent / 100);
+      }
+      totalEl.textContent = `Итого: ${total.toFixed(2)} €`;
+    }
+
+    document.getElementById("pay").onclick = async () => {
+      if (cart.length === 0) {
+        alert("Корзина пуста!");
         return;
       }
 
+      const line_items = cart.map(item => ({
+        price_data: {
+          currency: 'eur',
+          product_data: { name: item.name },
+          unit_amount: Math.round(item.price * 100),
+        },
+        quantity: item.quantity
+      }));
+
       try {
-        // fetch POST на локальный сервер
-        const response = await fetch("https://stripe-test-it0r.onrender.com/create-checkout-session", {
+        const response = await fetch("http://localhost:4242/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: Number(amount) })
+          body: JSON.stringify({ line_items, discount: discountPercent })
         });
 
         const data = await response.json();
 
         if (data.url) {
-          // редирект на Stripe Checkout
           window.location.href = data.url;
         } else {
           alert("Ошибка создания платежа");
