@@ -1,2 +1,61 @@
-<h1>✅ Оплата прошла успешно!</h1>
-<p>Это тестовая страница.</p>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Оплата прошла успешно</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 50px auto; }
+    h1 { color: green; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Спасибо! Оплата прошла успешно.</h1>
+  <p>Номер заказа: <span id="orderId"></span></p>
+
+  <h2>Ваш заказ:</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Товар</th>
+        <th>Цена</th>
+        <th>Кол-во</th>
+        <th>Итого</th>
+      </tr>
+    </thead>
+    <tbody id="orderItems"></tbody>
+  </table>
+
+  <script>
+    // Получаем ID сессии из query string
+    const params = new URLSearchParams(window.location.search);
+    const session_id = params.get('session_id');
+
+    if (!session_id) {
+      document.body.innerHTML = "<p>Невозможно получить данные заказа.</p>";
+    } else {
+      document.getElementById('orderId').textContent = session_id;
+
+      // Берём корзину из localStorage
+      const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+      const tbody = document.getElementById('orderItems');
+
+      Object.values(cart).forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.unitPrice.toFixed(2)} €</td>
+          <td>${item.qty}</td>
+          <td>${(item.unitPrice * item.qty).toFixed(2)} €</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // Очистим корзину после успешного платежа
+      localStorage.removeItem('cart');
+      localStorage.removeItem('activePromo');
+    }
+  </script>
+</body>
+</html>
