@@ -10,6 +10,7 @@
     button { padding: 5px 10px; margin-left: 10px; }
     input[type=number] { width: 50px; }
     .cart-item { margin-bottom: 5px; }
+    select { margin-left: 5px; }
   </style>
 </head>
 <body>
@@ -26,10 +27,15 @@
       <input type="number" min="1" value="1" id="qtyB">
       <button onclick="addToCart('Товар B', 8, 'qtyB')">Добавить</button>
     </div>
+
     <div class="product">
-      <span>Скидка — 10%</span>
-      <input type="number" min="1" value="1" id="qtyC">
-      <button onclick="addDiscount(10)">Применить скидку</button>
+      <span>Промокод:</span>
+      <select id="discountType">
+        <option value="percent">Процент (%)</option>
+        <option value="fixed">Фикс (€)</option>
+      </select>
+      <input type="number" min="1" value="10" id="discountValue">
+      <button onclick="applyPromo()">Применить</button>
     </div>
   </div>
 
@@ -42,7 +48,8 @@
 
   <script>
     const cart = [];
-    let discountPercent = 0;
+    let discountType = null;
+    let discountValue = 0;
 
     function addToCart(name, price, qtyId) {
       const qty = parseInt(document.getElementById(qtyId).value);
@@ -50,13 +57,33 @@
         alert("Введите корректное количество");
         return;
       }
-      cart.push({ name, price, quantity: qty });
+
+      const existing = cart.find(item => item.name === name);
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        cart.push({ name, price, quantity: qty });
+      }
+
       renderCart();
     }
 
-    function addDiscount(percent) {
-      discountPercent = percent;
-      alert(`Скидка ${percent}% будет применена к корзине`);
+    function applyPromo() {
+      const typeSelect = document.getElementById('discountType');
+      const valueInput = document.getElementById('discountValue');
+
+      discountType = typeSelect.value;
+      discountValue = parseFloat(valueInput.value);
+
+      if (!discountValue || discountValue <= 0) {
+        alert("Введите корректное значение скидки");
+        discountType = null;
+        discountValue = 0;
+        return;
+      }
+
+      alert(`Скидка ${discountValue}${discountType === 'percent' ? '%' : ' €'} будет применена к корзине`);
+      renderCart();
     }
 
     function renderCart() {
@@ -64,16 +91,24 @@
       const totalEl = document.getElementById('total');
       list.innerHTML = '';
       let total = 0;
-      cart.forEach((item, index) => {
+
+      cart.forEach(item => {
         const li = document.createElement('li');
         li.className = 'cart-item';
         li.textContent = `${item.name} — ${item.price} € × ${item.quantity} = ${item.price * item.quantity} €`;
         list.appendChild(li);
         total += item.price * item.quantity;
       });
-      if (discountPercent > 0) {
-        total = total * (1 - discountPercent / 100);
+
+      if (discountType && discountValue > 0) {
+        if (discountType === 'percent') {
+          total = total * (1 - discountValue / 100);
+        } else if (discountType === 'fixed') {
+          total = total - discountValue;
+        }
+        if (total < 0) total = 0;
       }
+
       totalEl.textContent = `Итого: ${total.toFixed(2)} €`;
     }
 
@@ -83,20 +118,20 @@
         return;
       }
 
-      const line_items = cart.map(item => ({
-        price_data: {
-          currency: 'eur',
-          product_data: { name: item.name },
-          unit_amount: Math.round(item.price * 100),
-        },
-        quantity: item.quantity
+      const cartForServer = cart.map(item => ({
+        name: item.name,
+        unitPrice: item.price,
+        qty: item.quantity
       }));
 
       try {
         const response = await fetch("http://localhost:4242/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ line_items, discount: discountPercent })
+          body: JSON.stringify({ 
+            cart: cartForServer, 
+            discount: { type: discountType, value: discountValue } 
+          })
         });
 
         const data = await response.json();
