@@ -87,63 +87,6 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-import fetch from 'node-fetch'; // npm install node-fetch
-
-let lastOrderNumber = 0; // для генерации номеров заказов
-
-// ===== POST /create-order =====
-app.post("/create-order", async (req, res) => {
-  try {
-    const order = req.body;
-
-    if (!order || !order.cart || order.cart.length === 0) {
-      return res.status(400).json({ success: false, error: "Пустой заказ" });
-    }
-
-    lastOrderNumber++;
-    const orderNumber = String(lastOrderNumber).padStart(3, '0');
-
-    // ===== Формируем сообщение для Telegram =====
-    let message = `📦 Новый заказ №${orderNumber}\n\n`;
-    message += `👤 Клиент: ${order.customer.name}\n`;
-    message += `📞 Телефон: ${order.customer.phone}\n`;
-    message += `📧 Email: ${order.customer.email}\n`;
-    message += `🏠 Адрес: ${order.customer.address || "-"}\n`;
-    message += `💬 Комментарий: ${order.customer.comment || "-"}\n\n`;
-    message += `🚚 Метод: ${order.delivery.method}\n`;
-    message += `📅 Дата: ${order.delivery.date || "-"}\n`;
-    message += `⏰ Время: ${order.delivery.time || "-"}\n\n`;
-    message += `🛒 Товары:\n`;
-    order.cart.forEach(i => {
-      message += `- ${i.name} x${i.qty} (${i.unitPrice.toFixed(2)} €)\n`;
-    });
-    message += `\n💰 Сумма: ${order.totals.total.toFixed(2)} €`;
-
-    // ===== Отправляем в Telegram =====
-    const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
-    const telegramRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
-    });
-
-    const telegramData = await telegramRes.json();
-    if (!telegramData.ok) {
-      console.error("Ошибка Telegram:", telegramData);
-      return res.status(500).json({ success: false, error: "Ошибка отправки в Telegram" });
-    }
-
-    res.json({ success: true, orderNumber });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: "Ошибка сервера" });
-  }
-});
-
-
 // Запуск сервера
 app.listen(4242, () => {
   console.log("🚀 Server running on http://localhost:4242");
