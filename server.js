@@ -70,14 +70,24 @@ app.post("/create-checkout-session", async (req, res) => {
       }
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items,
-      discounts,
-      success_url: "https://SUSHIX0.github.io/test/success.html?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "https://SUSHIX0.github.io/test/cancel.html"
-    });
+    const { lang } = req.body;
+
+const localeMap = {
+  ru: 'ru',
+  et: 'et',
+  en: 'en'
+};
+
+const session = await stripe.checkout.sessions.create({
+  mode: "payment",
+  payment_method_types: ["card"],
+  line_items,
+  discounts,
+  success_url: "https://SUSHIX0.github.io/test/success.html?session_id={CHECKOUT_SESSION_ID}",
+  cancel_url: "https://SUSHIX0.github.io/test/cancel.html",
+  locale: localeMap[lang] || 'auto'  // ← установка языка
+});
+
 
     res.json({ url: session.url });
 
