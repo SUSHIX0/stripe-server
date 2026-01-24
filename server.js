@@ -97,6 +97,12 @@ const session = await stripe.checkout.sessions.create({
   }
 });
 
+// Роут для проверки, что сервер жив
+app.get("/ping", (req, res) => {
+  res.send("Alive!");
+});
+
+
 // Запуск сервера
 app.listen(4242, () => {
   console.log("🚀 Server running on http://localhost:4242");
