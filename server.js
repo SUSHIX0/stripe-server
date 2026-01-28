@@ -8,7 +8,13 @@ const app = express();
 
 // CORS для фронта
 app.use(cors());
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.originalUrl === "/webhook") {
+    next(); // пропускаем, чтобы raw middleware сработал
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 // Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
