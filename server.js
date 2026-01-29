@@ -9,36 +9,35 @@ import bodyParser from 'body-parser';
 const app = express();
 
 /**
- * ВАЖНО:
- * - для /webhook НЕЛЬЗЯ использовать express.json()
- * - для остальных роутов МОЖНО
+ * ❗ ВАЖНО
+ * - /webhook — ТОЛЬКО raw body
+ * - остальные роуты — JSON
  */
 app.use(cors());
 app.use((req, res, next) => {
   if (req.originalUrl === '/webhook') {
-    next(); // raw body для Stripe
+    next();
   } else {
     express.json()(req, res, next);
   }
 });
 
-// Stripe
+// =====================
+// STRIPE
+// =====================
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-//
-// =======================
+// =====================
+// ВРЕМЕННОЕ ХРАНИЛИЩЕ ЗАКАЗОВ
+// =====================
+const orders = new Map();
+
+// =====================
 // CREATE CHECKOUT SESSION
-// =======================
-//
+// =====================
 app.post('/create-checkout-session', async (req, res) => {
   try {
-    const {
-      cart,
-      delivery = 0,
-      promo,
-      lang,
-      orderData
-    } = req.body;
+    const { cart, delivery = 0, promo, lang, orderData } = req.body;
 
     if (!Array.isArray(cart) || cart.length === 0) {
       return res.status(400).json({ error: 'Корзина пуста' });
@@ -48,25 +47,31 @@ app.post('/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'Нет данных заказа' });
     }
 
-    // ⬇️ ФОРМИРУЕМ ПОЛНЫЙ ЗАКАЗ (как для налички)
+    // 🔐 ID заказа
+    const orderId = Date.now().toString();
+
+    // 📦 Полный заказ (как для налички)
     const fullOrder = {
       ...orderData,
       cart,
       delivery,
       discount: orderData.discount || 0,
-      lang
+      lang,
+      orderId
     };
+
+    orders.set(orderId, fullOrder);
 
     // Stripe line items
     const line_items = cart
-      .filter(item => item.unitPrice > 0 && item.qty > 0)
-      .map(item => ({
+      .filter(i => i.unitPrice > 0 && i.qty > 0)
+      .map(i => ({
         price_data: {
           currency: 'eur',
-          product_data: { name: item.name },
-          unit_amount: Math.round(item.unitPrice * 100)
+          product_data: { name: i.name },
+          unit_amount: Math.round(i.unitPrice * 100)
         },
-        quantity: item.qty
+        quantity: i.qty
       }));
 
     if (delivery > 0) {
@@ -80,7 +85,7 @@ app.post('/create-checkout-session', async (req, res) => {
       });
     }
 
-    // Промокоды
+    // Промо
     const discounts = [];
     if (promo && promo.type && promo.value) {
       let coupon;
@@ -90,7 +95,7 @@ app.post('/create-checkout-session', async (req, res) => {
           percent_off: promo.value,
           duration: 'once'
         });
-      } else if (promo.type === 'flat_discount' || promo.type === 'min_total_discount') {
+      } else {
         coupon = await stripe.coupons.create({
           amount_off: Math.round(promo.value * 100),
           currency: 'eur',
@@ -110,9 +115,9 @@ app.post('/create-checkout-session', async (req, res) => {
       discounts,
       locale: localeMap[lang] || 'auto',
 
-      // ⬇️ ГЛАВНОЕ МЕСТО
+      // ❗ В metadata ТОЛЬКО ID
       metadata: {
-        order: JSON.stringify(fullOrder)
+        order_id: orderId
       },
 
       success_url: 'https://SUSHIX0.github.io/test/success.html',
@@ -121,54 +126,45 @@ app.post('/create-checkout-session', async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error('Stripe error:', err);
+    console.error('❌ Stripe error:', err);
     res.status(500).json({ error: 'Stripe error' });
   }
 });
 
-//
-// ==========
+// =====================
 // STRIPE WEBHOOK
-// ==========
+// =====================
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
   let event;
-
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    event = stripe.webhooks.constructEvent(req.body, sig, secret);
   } catch (err) {
     console.error('❌ Webhook signature error:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).send('Webhook Error');
   }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    const orderId = session.metadata?.order_id;
+    const order = orders.get(orderId);
 
-    let order = null;
-    try {
-      order = session.metadata?.order
-        ? JSON.parse(session.metadata.order)
-        : null;
-    } catch (e) {
-      console.error('❌ Ошибка парсинга metadata.order');
-    }
-
-    if (!order || !Array.isArray(order.cart)) {
-      console.error('❌ Некорректный заказ из Stripe:', order);
+    if (!order) {
+      console.error('❌ Заказ не найден:', orderId);
       return res.json({ received: true });
     }
 
     try {
-      // ⬇️ ОТПРАВЛЯЕМ НА TELEGRAM-СЕРВЕР
       await fetch('https://telegram-server-fcgc.onrender.com/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(order)
       });
 
-      console.log('✅ Заказ успешно отправлен в Telegram');
+      console.log('✅ Заказ отправлен в Telegram:', orderId);
+      orders.delete(orderId);
     } catch (err) {
       console.error('❌ Ошибка отправки в Telegram:', err);
     }
@@ -177,18 +173,16 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
   res.json({ received: true });
 });
 
-//
-// =====
+// =====================
 // HEALTHCHECK
-// =====
+// =====================
 app.get('/ping', (req, res) => {
   res.send('Alive!');
 });
 
-//
-// =====
-// START
-// =====
+// =====================
+// START SERVER
+// =====================
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => {
   console.log(`🚀 Stripe server running on port ${PORT}`);
