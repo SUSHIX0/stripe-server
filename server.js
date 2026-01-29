@@ -120,7 +120,7 @@ app.post('/create-checkout-session', async (req, res) => {
         order_id: orderId
       },
 
-      success_url: 'https://SUSHIX0.github.io/test/success.html?session_id={CHECKOUT_SESSION_ID}',
+      success_url: 'https://SUSHIX0.github.io/test/success.html',
       cancel_url: 'https://SUSHIX0.github.io/test/cancel.html'
     });
 
@@ -172,31 +172,6 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
   res.json({ received: true });
 });
-
-// ===== Получение деталей заказа по session_id =====
-app.get('/order-details', async (req, res) => {
-  const sessionId = req.query.session_id;
-
-  if (!sessionId) return res.status(400).json({ error: 'Нет session_id' });
-
-  try {
-    // Получаем сессию оплаты
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items'] // нужно для товаров
-    });
-
-    // Из metadata вытаскиваем заказ
-    const order = session.metadata?.order ? JSON.parse(session.metadata.order) : null;
-
-    if (!order) return res.status(404).json({ error: 'Данные заказа не найдены' });
-
-    res.json({ order });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 
 // =====================
 // HEALTHCHECK
