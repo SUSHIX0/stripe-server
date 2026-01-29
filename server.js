@@ -115,6 +115,14 @@ app.post('/create-checkout-session', async (req, res) => {
       discounts,
       locale: localeMap[lang] || 'auto',
 
+customer_creation: 'always',
+
+  customer_update: {
+    name: 'auto'
+  },
+
+  billing_address_collection: 'required',
+
       // ❗ В metadata ТОЛЬКО ID
       metadata: {
         order_id: orderId
