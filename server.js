@@ -120,7 +120,7 @@ app.post('/create-checkout-session', async (req, res) => {
         order_id: orderId
       },
 
-      success_url: 'https://SUSHIX0.github.io/test/success.html',
+      success_url: 'https://SUSHIX0.github.io/test/success.html?session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://SUSHIX0.github.io/test/cancel.html'
     });
 
