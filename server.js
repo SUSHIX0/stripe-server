@@ -108,16 +108,20 @@ app.post('/create-checkout-session', async (req, res) => {
 
     const localeMap = { ru: 'ru', et: 'et', en: 'en' };
 
+const customer = await stripe.customers.create({
+  name: orderData.checkout.name,      // имя покупателя
+  email: orderData.checkout.email     // email
+});
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items,
       discounts,
       locale: localeMap[lang] || 'auto',
+      customer: customer.id,
 
 customer_creation: 'always',
-
-  customer_name_collection: 'required',
 
       // ❗ В metadata ТОЛЬКО ID
       metadata: {
