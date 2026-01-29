@@ -117,7 +117,7 @@ app.post('/create-checkout-session', async (req, res) => {
 
 customer_creation: 'always',
 
-  billing_address_collection: 'required',
+  customer_name_collection: 'required',
 
       // ❗ В metadata ТОЛЬКО ID
       metadata: {
