@@ -108,6 +108,10 @@ app.post('/create-checkout-session', async (req, res) => {
 
     const localeMap = { ru: 'ru', et: 'et', en: 'en' };
 
+// 🔹 Добавляем перед stripe.checkout.sessions.create
+const baseCancelUrl = 'https://SUSHIX0.github.io/test/cancel.html';
+const cancel_url = `${baseCancelUrl}?lang=${lang || 'ru'}`;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -121,7 +125,7 @@ app.post('/create-checkout-session', async (req, res) => {
       },
 
       success_url: 'https://SUSHIX0.github.io/test/success.html',
-      cancel_url: 'https://SUSHIX0.github.io/test/cancel.html'
+        cancel_url // <-- теперь с lang
     });
 
     res.json({ url: session.url });

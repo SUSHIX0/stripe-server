@@ -2,94 +2,59 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Заказ успешно оформлен</title>
+  <title>Оплата прошла успешно</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-      background-color: #f9f9f9;
-    }
-    h2 {
-      color: #2a9d8f;
-    }
-    h3 {
-      margin-top: 20px;
-    }
-    p {
-      margin: 5px 0;
-    }
-    ul {
-      padding-left: 20px;
-    }
-    li {
-      margin-bottom: 5px;
-    }
-    .total {
-      font-weight: bold;
-      font-size: 1.2em;
-      margin-top: 15px;
-    }
-    .error {
-      color: red;
-      font-weight: bold;
-    }
+    body { font-family: sans-serif; max-width: 600px; margin: 50px auto; }
+    h1 { color: green; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
   </style>
 </head>
 <body>
-  <div id="content">
-    <p>Загрузка данных заказа...</p>
-  </div>
+  <h1>Спасибо! Оплата прошла успешно.</h1>
+  <p>Номер заказа: <span id="orderId"></span></p>
+
+  <h2>Ваш заказ:</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Товар</th>
+        <th>Цена</th>
+        <th>Кол-во</th>
+        <th>Итого</th>
+      </tr>
+    </thead>
+    <tbody id="orderItems"></tbody>
+  </table>
 
   <script>
-    // Получаем session_id из URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    const contentDiv = document.getElementById('content');
+    // Получаем ID сессии из query string
+    const params = new URLSearchParams(window.location.search);
+    const session_id = params.get('session_id');
 
-    if (!sessionId) {
-      contentDiv.innerHTML = '<p class="error">Ошибка: нет session_id</p>';
+    if (!session_id) {
+      document.body.innerHTML = "<p>Невозможно получить данные заказа.</p>";
     } else {
-      fetch(`https://stripe-test-it0r.onrender.com/order-details?session_id=${sessionId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            contentDiv.innerHTML = `<p class="error">Ошибка: ${data.error}</p>`;
-            return;
-          }
+      document.getElementById('orderId').textContent = session_id;
 
-          const order = data.order;
-          let html = `<h2>Спасибо за ваш заказ!</h2>`;
+      // Берём корзину из localStorage
+      const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+      const tbody = document.getElementById('orderItems');
 
-          html += `<p><strong>Способ получения:</strong> ${order.checkout.method}</p>`;
-          html += `<p><strong>Дата:</strong> ${order.checkout.date || '-'}</p>`;
-          html += `<p><strong>Время:</strong> ${order.checkout.time || '-'}</p>`;
-          if (order.checkout.method === 'Доставка') {
-            html += `<p><strong>Адрес доставки:</strong> ${order.checkout.address || '-'}</p>`;
-          }
-          html += `<p><strong>Промокод:</strong> ${order.checkout.promo || '-'}</p>`;
+      Object.values(cart).forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.unitPrice.toFixed(2)} €</td>
+          <td>${item.qty}</td>
+          <td>${(item.unitPrice * item.qty).toFixed(2)} €</td>
+        `;
+        tbody.appendChild(row);
+      });
 
-          html += '<h3>Корзина:</h3><ul>';
-          order.cart.forEach(item => {
-            const lineTotal = (item.unitPrice * item.qty).toFixed(2);
-            html += `<li>${item.name} x${item.qty} = ${lineTotal} €</li>`;
-          });
-          html += '</ul>';
-
-          html += `<p><strong>Доставка:</strong> ${order.delivery.toFixed(2)} €</p>`;
-          html += `<p><strong>Скидка:</strong> ${Math.abs(order.discount || 0).toFixed(2)} €</p>`;
-
-          const subtotal = order.cart.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
-          const total = subtotal - Math.abs(order.discount || 0) + order.delivery;
-          html += `<p class="total">Итог: ${total.toFixed(2)} €</p>`;
-
-          contentDiv.innerHTML = html;
-        })
-        .catch(err => {
-          contentDiv.innerHTML = `<p class="error">Ошибка при получении заказа: ${err.message}</p>`;
-        });
+      // Очистим корзину после успешного платежаc
+      localStorage.removeItem('cart');
+      localStorage.removeItem('activePromo');
     }
   </script>
 </body>
